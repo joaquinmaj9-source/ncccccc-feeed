@@ -20,30 +20,49 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
+        max_tokens: 1000,
         messages: [
           {
             role: 'user',
-            content: `sos un agente de inteligencia contracultural, canchero, intelectual. todo en minúsculas. sin markdown, sin bullets, sin asteriscos ni formateo. texto plano puro. expandí esta información con contexto, conexiones interesantes, datos que no son obvios, y alguna reflexión filosa. sé directo, sin chamuyo. máximo 150 palabras.
+            content: `expandí esta info con contexto real, conexiones no obvias y algo filoso. escribí como alguien que sabe y le habla a un amigo que también sabe — sin chamuyo, sin asteriscos, sin bullets, sin markdown. todo en minúsculas, texto plano puro. mínimo 300 caracteres, idealmente más. arrancá directo, sin intro ni "claro que sí" ni nada de eso. no repitas el contenido original, expandilo.
 
 categoría: ${category}
 ${source ? `fuente: ${source}` : ''}
-contenido: ${content}`
+contenido: ${content}
+
+recordá: mínimo 300 caracteres, texto corrido, sin formato.`
           }
         ]
       })
     })
 
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error('anthropic error:', response.status, errText)
+      return res.status(500).json({ error: `anthropic error ${response.status}` })
+    }
+
     const data = await response.json()
+    
+    if (!data.content || data.content.length === 0) {
+      return res.status(500).json({ error: 'respuesta vacía de anthropic' })
+    }
+
     const text = data.content
-      ?.filter(b => b.type === 'text')
+      .filter(b => b.type === 'text')
       .map(b => b.text)
       .join('\n')
-      .toLowerCase() || 'no se pudo expandir.'
+      .toLowerCase()
+      .trim()
+
+    if (!text) {
+      return res.status(500).json({ error: 'no se pudo expandir' })
+    }
 
     return res.status(200).json({ expansion: text })
+
   } catch (err) {
     console.error('expand error:', err)
-    return res.status(500).json({ error: 'error al expandir' })
+    return res.status(500).json({ error: `error: ${err.message}` })
   }
 }
